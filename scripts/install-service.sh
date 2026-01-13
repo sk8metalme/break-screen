@@ -2,10 +2,13 @@
 #
 # break-screen インストールスクリプト
 #
-# このスクリプトはpm2を使ってbreak-screenをシステム起動時に自動起動するように設定します
+# このスクリプトはlaunchdを使ってbreak-screenをシステム起動時に自動起動するように設定します
 #
 
 set -e
+
+PLIST_SRC="$(cd "$(dirname "$0")/.." && pwd)/com.user.break-screen.plist"
+PLIST_DST="$HOME/Library/LaunchAgents/com.user.break-screen.plist"
 
 echo "=== break-screen インストール ==="
 
@@ -17,21 +20,31 @@ npm run build
 echo "2. ログディレクトリを作成しています..."
 mkdir -p logs
 
-# pm2でアプリを起動
-echo "3. PM2でアプリを起動しています..."
-pm2 start ecosystem.config.js
+# LaunchAgentsディレクトリ作成
+echo "3. LaunchAgentsディレクトリを作成しています..."
+mkdir -p "$HOME/Library/LaunchAgents"
 
-# システム起動時の自動起動を設定
-echo "4. システム起動時の自動起動を設定しています..."
-pm2 save
-pm2 startup
+# 既存のサービスを停止・削除
+if launchctl list | grep -q "com.user.break-screen"; then
+    echo "4. 既存のサービスを停止しています..."
+    launchctl unload "$PLIST_DST" 2>/dev/null || true
+fi
+
+# plistファイルをコピー
+echo "5. launchd設定ファイルをコピーしています..."
+cp "$PLIST_SRC" "$PLIST_DST"
+
+# サービスを起動
+echo "6. launchdでサービスを起動しています..."
+launchctl load "$PLIST_DST"
 
 echo ""
 echo "✅ インストール完了！"
 echo ""
 echo "使い方:"
-echo "  pm2 logs break-screen   # ログを表示"
-echo "  pm2 stop break-screen   # 停止"
-echo "  pm2 restart break-screen # 再起動"
-echo "  pm2 delete break-screen # 削除"
+echo "  launchctl list | grep break-screen  # ステータス確認"
+echo "  tail -f logs/output.log             # ログを表示"
+echo "  launchctl stop com.user.break-screen   # 停止"
+echo "  launchctl start com.user.break-screen  # 再起動"
+echo "  launchctl unload $PLIST_DST         # 削除"
 echo ""
